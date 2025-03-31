@@ -2,11 +2,12 @@ import rospy
 import numpy as np
 
 from std_srvs.srv import Empty
-from gazebo_msgs.msg import ModelState
-from gazebo_msgs.srv import SetModelState, GetModelState
+from gazebo_msgs.msg import ModelState, ODEPhysics
+from gazebo_msgs.srv import SetModelState, GetModelState, SetPhysicsProperties
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool
+from geometry_msgs.msg import Vector3
 
 def create_model_state(x, y, z, angle):
     # the rotation of the angle is in (0, 0, 1) direction
@@ -33,6 +34,59 @@ class GazeboSimulation():
         
         self.collision_count = 0
         self._collision_sub = rospy.Subscriber("/collision", Bool, self.collision_monitor)
+
+    def make_physics_easier(self, max_step_size=0.005, real_time_update_rate=200):
+        """
+        Makes physics simulation lighter and easier to run!
+        Perfect for development when you don't need perfect physics.
+        
+        Args:
+            max_step_size (float): Time duration in seconds for each physics update step
+            real_time_update_rate (int): The number of physics update attempts per second (Hz)
+        
+        Returns:
+            bool: True if we successfully made physics easier, False if not
+        """
+        try:
+            rospy.loginfo("🚀 Attempting to make physics simulation lighter...")
+            rospy.wait_for_service('/gazebo/set_physics_properties', timeout=5)
+            set_physics = rospy.ServiceProxy('/gazebo/set_physics_properties', SetPhysicsProperties)
+            
+            ode_config = ODEPhysics()
+            
+            ode_config.auto_disable_bodies = False
+            ode_config.sor_pgs_precon_iters = 0
+            ode_config.sor_pgs_iters = 50
+            ode_config.sor_pgs_w = 1.3
+            ode_config.sor_pgs_rms_error_tol = 0.0
+            ode_config.contact_surface_layer = 0.001
+            ode_config.contact_max_correcting_vel = 0.0
+            ode_config.cfm = 0.0
+            ode_config.erp = 0.2
+            ode_config.max_contacts = 20
+            
+            gravity = Vector3()
+            gravity.x = 0.0
+            gravity.y = 0.0
+            gravity.z = -9.8
+            
+            result = set_physics(
+                max_step_size,
+                real_time_update_rate, 
+                gravity, 
+                ode_config
+            )
+            
+            if result.success:
+                rospy.loginfo("✨ Physics made lighter successfully! Your CPU will thank you.")
+            else:
+                rospy.logwarn("😕 Couldn't make physics lighter through service call.")
+                
+            return result.success
+            
+        except rospy.ROSException as e:
+            rospy.logerr(f"💥 Making physics lighter failed: {str(e)}")
+            return False
         
     def collision_monitor(self, msg):
         if msg.data:

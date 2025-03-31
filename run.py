@@ -73,6 +73,10 @@ if __name__ == "__main__":
     
     # GazeboSimulation provides useful interface to communicate with gazebo  
     gazebo_sim = GazeboSimulation(init_position=INIT_POSITION)
+    gazebo_sim.make_physics_easier(
+        max_step_size=0.01,
+        real_time_update_rate=100
+    )
     
     init_coor = (INIT_POSITION[0], INIT_POSITION[1])
     goal_coor = (INIT_POSITION[0] + GOAL_POSITION[0], INIT_POSITION[1] + GOAL_POSITION[1])
